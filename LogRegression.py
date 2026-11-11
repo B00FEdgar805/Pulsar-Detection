@@ -23,10 +23,10 @@ df.columns = [
     "profile_std",
     "profile_kurtosis",
     "profile_skewness",
-    "dm_snr_mean",
-    "dm_snr_std",
-    "dm_snr_kurtosis",
-    "dm_snr_skewness",
+    "dm-snr_mean",
+    "dm-snr_std",
+    "dm-snr_kurtosis",
+    "dm-snr_skewness",
     "target"
 ]
 
@@ -64,9 +64,12 @@ y_pred = model.predict(X_test)
 y_probability = model.predict_proba(X_test)[:, 1]
 
 # Evaluate the model
-print("Accuracy:", accuracy_score(y_test, y_pred))
+print("\nTest accuracy:", accuracy_score(y_test, y_pred))
 print("Balanced accuracy:", balanced_accuracy_score(y_test, y_pred))
 print("ROC-AUC:", roc_auc_score(y_test, y_probability))
+
+print("\nConfusion matrix:")
+print(confusion_matrix(y_test, y_pred))
 
 ConfusionMatrixDisplay.from_predictions(
     y_test,

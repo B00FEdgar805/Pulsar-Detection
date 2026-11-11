@@ -1,90 +1,148 @@
 import pandas as pd
-import numpy as np
 
-from sklearn.model_selection import train_test_split, StratifiedKFold, GridSearchCV
-from sklearn.pipeline import Pipeline
-from sklearn.preprocessing import StandardScaler
-from sklearn.linear_model import LogisticRegression
+from sklearn.model_selection import (
+    RandomizedSearchCV,
+    StratifiedKFold,
+    train_test_split,
+)
 from sklearn.metrics import (
+    accuracy_score,
+    average_precision_score,
     classification_report,
     confusion_matrix,
-    average_precision_score,
-    roc_auc_score
+    roc_auc_score,
 )
+from xgboost import XGBClassifier
 
-# Load data
-df = pd.read_csv("HTRU_2.csv", header=None)
 
-X = df.iloc[:, :8]
-y = df.iloc[:, 8]
+# ----------------------------------------
+# 1. Load the dataset
+# ----------------------------------------
 
-# Keep the final test set untouched
-X_train, X_test, y_train, y_test = train_test_split(
-    X, y,
-    test_size=0.25,
-    random_state=42,
-    stratify=y
-)
-
-# Scaling and model
-pipeline = Pipeline([
-    ("scaler", StandardScaler()),
-    ("model", LogisticRegression(max_iter=5000))
-])
-
-# Values to test
-param_grid = [
-    {
-        "model__solver": ["liblinear"],
-        "model__penalty": ["l1", "l2"],
-        "model__C": [0.001, 0.01, 0.1, 1, 10, 100],
-        "model__class_weight": [None, "balanced"]
-    },
-    {
-        "model__solver": ["lbfgs"],
-        "model__penalty": ["l2"],
-        "model__C": [0.001, 0.01, 0.1, 1, 10, 100],
-        "model__class_weight": [None, "balanced"]
-    }
+column_names = [
+    "profile_mean",
+    "profile_std",
+    "profile_kurtosis",
+    "profile_skewness",
+    "dm_snr_mean",
+    "dm_snr_std",
+    "dm_snr_kurtosis",
+    "dm_snr_skewness",
+    "target",
 ]
 
-# Preserve class proportions in every fold
+df = pd.read_csv("HTRU_2.csv", header=None, names=column_names)
+
+X = df.drop(columns="target")
+y = df["target"]
+
+
+# ----------------------------------------
+# 2. Split into training and test sets
+# ----------------------------------------
+
+X_train, X_test, y_train, y_test = train_test_split(
+    X,
+    y,
+    test_size=0.25,
+    random_state=42,
+    stratify=y,
+)
+
+
+# ----------------------------------------
+# 3. Create the base model
+# ----------------------------------------
+
+model = XGBClassifier(
+    objective="binary:logistic",
+    eval_metric="logloss",
+    tree_method="hist",
+    random_state=42,
+    n_jobs=1,
+)
+
+
+# ----------------------------------------
+# 4. Define settings to try
+# ----------------------------------------
+
+param_distributions = {
+    "n_estimators": [100, 200, 300, 500],
+    "max_depth": [2, 3, 4, 5, 6],
+    "learning_rate": [0.01, 0.05, 0.1, 0.2],
+    "subsample": [0.7, 0.8, 0.9, 1.0],
+    "colsample_bytree": [0.7, 0.8, 0.9, 1.0],
+    "min_child_weight": [1, 3, 5, 10],
+    "scale_pos_weight": [1, 3, 6, 10],
+}
+
+
+# ----------------------------------------
+# 5. Set up cross-validation
+# ----------------------------------------
+
 cv = StratifiedKFold(
     n_splits=5,
     shuffle=True,
-    random_state=42
+    random_state=42,
 )
 
-search = GridSearchCV(
-    estimator=pipeline,
-    param_grid=param_grid,
-    scoring="average_precision",  # PR-AUC; useful for imbalanced data
+search = RandomizedSearchCV(
+    estimator=model,
+    param_distributions=param_distributions,
+    n_iter=30,
+    scoring="average_precision",
     cv=cv,
+    random_state=42,
     n_jobs=-1,
-    refit=True
+    verbose=2,
+    refit=True,
 )
+
+
+# ----------------------------------------
+# 6. Run the search
+# ----------------------------------------
+
+print("Starting hyperparameter search...")
 
 search.fit(X_train, y_train)
 
-print("Best parameters:")
-print(search.best_params_)
+print("\nBest parameters:")
+for parameter, value in search.best_params_.items():
+    print(f"  {parameter}: {value}")
 
-print("\nBest cross-validation PR-AUC:")
-print(search.best_score_)
+print(
+    "\nBest mean cross-validation average precision:",
+    f"{search.best_score_:.4f}",
+)
 
-# Evaluate once on the untouched test set
-y_probability = search.predict_proba(X_test)[:, 1]
-y_pred = search.predict(X_test)
+# refit=True retrains the best settings on all training data.
+best_model = search.best_estimator_
 
-print("\nTest PR-AUC:", average_precision_score(y_test, y_probability))
-print("Test ROC-AUC:", roc_auc_score(y_test, y_probability))
+
+# ----------------------------------------
+# 7. Evaluate the best model on test data
+# ----------------------------------------
+
+y_pred = best_model.predict(X_test)
+y_scores = best_model.predict_proba(X_test)[:, 1]
+
+print("\n--- Test set results ---")
+print(f"Accuracy:          {accuracy_score(y_test, y_pred):.4f}")
+print(f"ROC-AUC:           {roc_auc_score(y_test, y_scores):.4f}")
+print(f"Average precision: {average_precision_score(y_test, y_scores):.4f}")
 
 print("\nConfusion matrix:")
 print(confusion_matrix(y_test, y_pred))
 
 print("\nClassification report:")
-print(classification_report(
-    y_test,
-    y_pred,
-    target_names=["Non-pulsar", "Pulsar"]
-))
+print(
+    classification_report(
+        y_test,
+        y_pred,
+        target_names=["Non-pulsar (0)", "Pulsar (1)"],
+        zero_division=0,
+    )
+)

@@ -1,9 +1,11 @@
 import pandas as pd
-
+import matplotlib.pyplot as plt
 from sklearn.model_selection import train_test_split
 from sklearn.metrics import (
+    ConfusionMatrixDisplay,
     accuracy_score,
     average_precision_score,
+    balanced_accuracy_score,
     classification_report,
     confusion_matrix,
     roc_auc_score,
@@ -11,22 +13,22 @@ from sklearn.metrics import (
 from xgboost import XGBClassifier
 
 
-# The CSV does not have a header, so provide column names.
-column_names = [
+df = pd.read_csv("HTRU_2.csv", header=None)
+
+# Assign meaningful column names
+df.columns = [
     "profile_mean",
     "profile_std",
     "profile_kurtosis",
     "profile_skewness",
-    "dm_snr_mean",
-    "dm_snr_std",
-    "dm_snr_kurtosis",
-    "dm_snr_skewness",
-    "target",
+    "dm-snr_mean",
+    "dm-snr_std",
+    "dm-snr_kurtosis",
+    "dm-snr_skewness",
+    "target"
 ]
 
-df = pd.read_csv("HTRU_2.csv", header=None, names=column_names)
-
-# First eight columns are features; the last column is the class.
+# Separate input features and target
 X = df.drop(columns="target")
 y = df["target"]
 
@@ -52,11 +54,12 @@ print(f"Positive class weight: {class_weight:.2f}")
 model = XGBClassifier(
     objective="binary:logistic",
     n_estimators=200,
-    max_depth=3,
-    learning_rate=0.1,
-    subsample=0.8,
-    colsample_bytree=0.8,
-    scale_pos_weight=class_weight,
+    max_depth=6,
+    learning_rate=0.01,
+    subsample=0.7,
+    min_child_weight=1,
+    colsample_bytree=0.9,
+    scale_pos_weight=3,
     eval_metric="logloss",
     random_state=42,
     n_jobs=-1,
@@ -70,10 +73,22 @@ y_scores = model.predict_proba(X_test)[:, 1]
 
 print("\nTest accuracy:", f"{accuracy_score(y_test, y_pred):.4f}")
 print("ROC-AUC:", f"{roc_auc_score(y_test, y_scores):.4f}")
+print("Balanced accuracy:", balanced_accuracy_score(y_test, y_pred))
 print("Average precision:", f"{average_precision_score(y_test, y_scores):.4f}")
 
 print("\nConfusion matrix:")
 print(confusion_matrix(y_test, y_pred))
+
+
+ConfusionMatrixDisplay.from_predictions(
+    y_test,
+    y_pred,
+    display_labels=["Non-pulsar", "Pulsar"],
+    cmap="Blues"
+)
+
+plt.title("Logistic Regression Confusion Matrix")
+plt.show()
 
 print("\nClassification report:")
 print(classification_report(
