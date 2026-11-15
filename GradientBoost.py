@@ -32,7 +32,7 @@ df.columns = [
 X = df.drop(columns="target")
 y = df["target"]
 
-# Keep the proportion of pulsars similar in both sets.
+# Split the data while preserving the class proportions
 X_train, X_test, y_train, y_test = train_test_split(
     X,
     y,
@@ -51,6 +51,7 @@ print(f"Test examples: {len(X_test)}")
 print(f"Positive class weight: {class_weight:.2f}")
 
 # Create and train the model.
+# This is the best model found after hyperparameter tuning using RandomizedSearchCV.
 model = XGBClassifier(
     objective="binary:logistic",
     n_estimators=200,
@@ -67,10 +68,10 @@ model = XGBClassifier(
 
 model.fit(X_train, y_train)
 
-# Class predictions and scores for the positive class.
 y_pred = model.predict(X_test)
 y_scores = model.predict_proba(X_test)[:, 1]
 
+# Evaluate the model
 print("\nTest accuracy:", f"{accuracy_score(y_test, y_pred):.4f}")
 print("ROC-AUC:", f"{roc_auc_score(y_test, y_scores):.4f}")
 print("Balanced accuracy:", balanced_accuracy_score(y_test, y_pred))
@@ -87,13 +88,13 @@ ConfusionMatrixDisplay.from_predictions(
     cmap="Blues"
 )
 
-plt.title("Logistic Regression Confusion Matrix")
+plt.title("Gradient Boosting Confusion Matrix")
 plt.show()
 
 print("\nClassification report:")
 print(classification_report(
     y_test,
     y_pred,
-    target_names=["Non-pulsar (0)", "Pulsar (1)"],
+    target_names=["Non-pulsar", "Pulsar"],
     zero_division=0,
 ))

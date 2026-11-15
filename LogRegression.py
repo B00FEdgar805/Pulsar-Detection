@@ -1,6 +1,5 @@
 import pandas as pd
 import matplotlib.pyplot as plt
-
 from sklearn.model_selection import train_test_split
 from sklearn.pipeline import Pipeline
 from sklearn.preprocessing import StandardScaler
@@ -14,7 +13,7 @@ from sklearn.metrics import (
     roc_auc_score
 )
 
-# Load the CSV.
+
 df = pd.read_csv("HTRU_2.csv", header=None)
 
 # Assign meaningful column names
@@ -44,6 +43,7 @@ X_train, X_test, y_train, y_test = train_test_split(
 )
 
 # Create a preprocessing and model pipeline
+# This is the best model found after hyperparameter tuning using RandomizedSearchCV.
 model = Pipeline([
     ("scaler", StandardScaler()),
     ("logistic_regression", LogisticRegression(
@@ -85,5 +85,7 @@ print("\nClassification report:")
 print(classification_report(
     y_test,
     y_pred,
-    target_names=["Non-pulsar", "Pulsar"]
+    target_names=["Non-pulsar", "Pulsar"],
+    zero_division=0,
+
 ))
