@@ -11,7 +11,7 @@ from sklearn.metrics import (
     roc_auc_score,
 )
 from xgboost import XGBClassifier
-
+import seaborn as sns
 
 df = pd.read_csv("HTRU_2.csv", header=None)
 
@@ -32,6 +32,24 @@ df.columns = [
 X = df.drop(columns="target")
 y = df["target"]
 
+# Visualize the class distribution
+print(df["target"].value_counts())
+sns.countplot(data=df, x="target")
+plt.xticks([0, 1], ["Non-pulsar", "Pulsar"])
+plt.title("Class Distribution")
+plt.xlabel("Class")
+plt.ylabel("Number of candidates")
+plt.tight_layout()
+plt.show()
+
+
+# Visualize the distribution of profile_mean by class
+sns.boxplot(data=df, x="target", y="profile_mean")
+plt.xticks([0, 1], ["Non-pulsar", "Pulsar"])
+plt.title("Profile Mean by Class")
+plt.tight_layout()
+plt.show()
+
 # Split the data while preserving the class proportions
 X_train, X_test, y_train, y_test = train_test_split(
     X,
@@ -45,10 +63,6 @@ X_train, X_test, y_train, y_test = train_test_split(
 negative_count = (y_train == 0).sum()
 positive_count = (y_train == 1).sum()
 class_weight = negative_count / positive_count
-
-print(f"Training examples: {len(X_train)}")
-print(f"Test examples: {len(X_test)}")
-print(f"Positive class weight: {class_weight:.2f}")
 
 # Create and train the model.
 # This is the best model found after hyperparameter tuning using RandomizedSearchCV.
