@@ -1,6 +1,7 @@
 import pandas as pd
 import matplotlib.pyplot as plt
 from sklearn.model_selection import train_test_split
+from sklearn.inspection import PartialDependenceDisplay
 from sklearn.metrics import (
     ConfusionMatrixDisplay,
     accuracy_score,
@@ -59,6 +60,9 @@ X_train, X_test, y_train, y_test = train_test_split(
     stratify=y,
 )
 
+# Keep the test set untouched while reserving data for validation.
+
+
 # Calculate the class weight using the training data only.
 negative_count = (y_train == 0).sum()
 positive_count = (y_train == 1).sum()
@@ -81,6 +85,34 @@ model = XGBClassifier(
 )
 
 model.fit(X_train, y_train)
+
+# Plot training and validation log loss for each boosting round.
+loss_history = model.evals_result()
+fig, ax = plt.subplots(figsize=(8, 5))
+for dataset_name, metrics in loss_history.items():
+    label = "Training" if dataset_name.endswith("0") else "Validation"
+    ax.plot(range(1, len(metrics["logloss"]) + 1), metrics["logloss"], label=label)
+ax.set_title("Training and Validation Loss")
+ax.set_xlabel("Boosting round")
+ax.set_ylabel("Log loss")
+ax.legend()
+ax.grid(True, alpha=0.3)
+plt.tight_layout()
+plt.show()
+
+# Plot feature importance, sorted from least to most important.
+feature_importance = pd.Series(
+    model.feature_importances_,
+    index=X.columns,
+).sort_values()
+fig, ax = plt.subplots(figsize=(8, 5))
+ax.barh(feature_importance.index, feature_importance.values, color="steelblue")
+ax.set_title("Feature Importance")
+ax.set_xlabel("Importance")
+plt.tight_layout()
+plt.show()
+
+
 
 y_pred = model.predict(X_test)
 y_scores = model.predict_proba(X_test)[:, 1]
